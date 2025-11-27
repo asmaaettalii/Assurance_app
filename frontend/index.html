@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blockchain Insurance DApp</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+</head>
+
+<body class="bg-gray-100 font-sans">
+    <div class="container mx-auto p-4">
+        <header class="mb-8 text-center">
+            <h1 class="text-4xl font-bold text-blue-600">Blockchain Insurance</h1>
+            <p class="text-gray-600">Decentralized Parametric Insurance</p>
+            <button id="connectWallet"
+                class="mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                Connect Wallet
+            </button>
+            <p id="walletAddress" class="mt-2 text-sm text-gray-500"></p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Insurer Section -->
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-semibold mb-4 text-gray-800">Insurer Panel</h2>
+
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-2">Create New Contract</h3>
+                    <input type="text" id="insuredAddress" placeholder="Insured Address"
+                        class="w-full p-2 border rounded mb-2">
+                    <input type="number" id="premiumAmount" placeholder="Premium (ETH)"
+                        class="w-full p-2 border rounded mb-2">
+                    <input type="number" id="indemnityAmount" placeholder="Indemnity (ETH)"
+                        class="w-full p-2 border rounded mb-2">
+                    <button id="createContract"
+                        class="w-full bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                        Create Contract
+                    </button>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-medium mb-2">Manage Claims</h3>
+                    <input type="number" id="contractIdIndemnify" placeholder="Contract ID"
+                        class="w-full p-2 border rounded mb-2">
+                    <button id="payIndemnity"
+                        class="w-full bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                        Pay Indemnity
+                    </button>
+                </div>
+            </div>
+
+            <!-- Insured Section -->
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-semibold mb-4 text-gray-800">Insured Panel</h2>
+
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-2">Contract Details</h3>
+                    <input type="number" id="contractIdView" placeholder="Contract ID"
+                        class="w-full p-2 border rounded mb-2">
+                    <button id="getContractDetails"
+                        class="w-full bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded mb-4">
+                        View Contract
+                    </button>
+                    <div id="contractDetails" class="text-sm text-gray-700 bg-gray-50 p-4 rounded hidden">
+                        <!-- Details will be injected here -->
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-2">Actions</h3>
+                    <button id="payPremium"
+                        class="w-full bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded mb-2">
+                        Pay Premium
+                    </button>
+                    <button id="declareClaim"
+                        class="w-full bg-orange-500 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded">
+                        Declare Claim
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- My Contracts Section -->
+        <div class="mt-8 bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-semibold mb-4 text-gray-800">My Contracts</h2>
+            <button id="listMyContracts"
+                class="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded mb-4">
+                Refresh List
+            </button>
+            <div id="myContractsList" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Contract items will be injected here -->
+            </div>
+        </div>
+
+        <div id="statusMessage" class="mt-8 text-center text-lg font-semibold"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
