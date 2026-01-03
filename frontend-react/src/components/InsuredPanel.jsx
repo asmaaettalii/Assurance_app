@@ -2,13 +2,27 @@ import React, { useState } from 'react';
 import { ethers } from 'ethers';
 import { useBlockchain } from '../context/BlockchainContext';
 import toast from 'react-hot-toast';
-import { Search, CreditCard, AlertTriangle } from 'lucide-react';
+import { Search, CreditCard, AlertTriangle, FileText, Link as LinkIcon, CheckCircle, XCircle, Upload } from 'lucide-react';
+import { uploadToIPFS } from '../utils/ipfs';
 
 const InsuredPanel = () => {
-    const { contract } = useBlockchain();
+    const { contract, account } = useBlockchain();
     const [contractId, setContractId] = useState('');
     const [contractDetails, setContractDetails] = useState(null);
     const [loading, setLoading] = useState(false);
+
+    // Form states
+    const [description, setDescription] = useState('');
+    const [evidence, setEvidence] = useState('');
+    const [file, setFile] = useState(null);
+
+    const claimStatusMap = ["NONE", "DECLARED", "APPROVED", "REJECTED"];
+    const claimStatusColors = [
+        "text-gray-500 bg-gray-100",
+        "text-yellow-600 bg-yellow-50",
+        "text-green-600 bg-green-50",
+        "text-red-600 bg-red-50"
+    ];
 
     const getContractDetails = async () => {
         if (!contract) return toast.error("Please connect wallet first");
@@ -29,7 +43,10 @@ const InsuredPanel = () => {
                 premium: ethers.formatEther(details[2]),
                 indemnity: ethers.formatEther(details[3]),
                 status: Number(details[4]),
-                isPaid: details[5]
+                isPaid: details[5],
+                claimStatus: Number(details[6]),
+                claimDescription: details[7],
+                claimEvidence: details[8]
             });
         } catch (error) {
             console.error(error);
@@ -60,13 +77,34 @@ const InsuredPanel = () => {
 
     const declareClaim = async () => {
         if (!contract) return toast.error("Please connect wallet first");
+        if (!description || (!evidence && !file)) return toast.error("Please provide description and evidence (file or link)");
+
         try {
             setLoading(true);
-            const tx = await contract.declarerSinistre(contractId);
+            let evidenceLink = evidence;
+
+            if (file) {
+                try {
+                    toast.loading("Uploading proof to IPFS...", { id: 'ipfs' });
+                    const cid = await uploadToIPFS(file);
+                    evidenceLink = `https://gateway.pinata.cloud/ipfs/${cid}`;
+                    toast.success("Proof uploaded!", { id: 'ipfs' });
+                } catch (err) {
+                    console.error("Upload error details:", err);
+                    toast.error("Upload failed: " + (err.message || "Check console"));
+                    setLoading(false);
+                    return;
+                }
+            }
+
+            const tx = await contract.declarerSinistre(contractId, description, evidenceLink);
             toast.loading("Declaring claim...", { id: 'claim' });
             await tx.wait();
             toast.success("Claim declared successfully!", { id: 'claim' });
             getContractDetails(); // Refresh
+            setDescription('');
+            setEvidence('');
+            setFile(null);
         } catch (error) {
             console.error(error);
             toast.error("Error declaring claim: " + (error.reason || error.message));
@@ -75,8 +113,8 @@ const InsuredPanel = () => {
         }
     };
 
-    const statusMap = ["ACTIVE", "CLAIMED", "INDEMNIFIED"];
-    const statusColors = ["text-green-600 bg-green-50", "text-orange-600 bg-orange-50", "text-blue-600 bg-blue-50"];
+    const globalStatusMap = ["ACTIVE", "CLAIMED", "INDEMNIFIED"];
+    const globalStatusColors = ["text-green-600 bg-green-50", "text-orange-600 bg-orange-50", "text-blue-600 bg-blue-50"];
 
     return (
         <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
@@ -103,54 +141,126 @@ const InsuredPanel = () => {
                 </div>
 
                 {contractDetails && (
-                    <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8 animate-fade-in">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8 text-sm">
-                            <div>
-                                <span className="block text-gray-500 text-xs uppercase tracking-wide">Insurer</span>
-                                <span className="font-mono text-gray-800 break-all">{contractDetails.insurer}</span>
+                    <div className="space-y-6">
+                        {/* Contract Details Card */}
+                        <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 animate-fade-in">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8 text-sm">
+                                <div>
+                                    <span className="block text-gray-500 text-xs uppercase tracking-wide">Insurer</span>
+                                    <span className="font-mono text-gray-800 break-all">{contractDetails.insurer}</span>
+                                </div>
+                                <div>
+                                    <span className="block text-gray-500 text-xs uppercase tracking-wide">Global Status</span>
+                                    <span className={`inline-block px-2 py-1 rounded-full text-xs font-bold mt-1 ${globalStatusColors[contractDetails.status]}`}>
+                                        {globalStatusMap[contractDetails.status]}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="block text-gray-500 text-xs uppercase tracking-wide">Premium</span>
+                                    <span className="font-medium text-lg text-gray-900">{contractDetails.premium} ETH</span>
+                                </div>
+                                <div>
+                                    <span className="block text-gray-500 text-xs uppercase tracking-wide">Indemnity</span>
+                                    <span className="font-medium text-lg text-gray-900">{contractDetails.indemnity} ETH</span>
+                                </div>
+                                <div>
+                                    <span className="block text-gray-500 text-xs uppercase tracking-wide">Payment Status</span>
+                                    <span className={`font-bold ${contractDetails.isPaid ? "text-green-600" : "text-red-600"}`}>
+                                        {contractDetails.isPaid ? "Paid" : "Unpaid"}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="block text-gray-500 text-xs uppercase tracking-wide">Claim Status</span>
+                                    <span className={`inline-block px-2 py-1 rounded-full text-xs font-bold mt-1 ${claimStatusColors[contractDetails.claimStatus]}`}>
+                                        {claimStatusMap[contractDetails.claimStatus]}
+                                    </span>
+                                </div>
                             </div>
-                            <div>
-                                <span className="block text-gray-500 text-xs uppercase tracking-wide">Status</span>
-                                <span className={`inline-block px-2 py-1 rounded-full text-xs font-bold mt-1 ${statusColors[contractDetails.status]}`}>
-                                    {statusMap[contractDetails.status]}
-                                </span>
+                        </div>
+
+                        {/* Claim Information View */}
+                        {contractDetails.claimStatus > 0 && (
+                            <div className="bg-orange-50 p-6 rounded-xl border border-orange-100">
+                                <h3 className="text-md font-bold text-orange-800 mb-3 flex items-center">
+                                    <FileText className="w-4 h-4 mr-2" /> Claim Details
+                                </h3>
+                                <div className="space-y-2 text-sm">
+                                    <p><span className="font-semibold">Description:</span> {contractDetails.claimDescription}</p>
+                                    <p><span className="font-semibold">Evidence:</span> <a href={contractDetails.claimEvidence} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{contractDetails.claimEvidence}</a></p>
+                                </div>
                             </div>
-                            <div>
-                                <span className="block text-gray-500 text-xs uppercase tracking-wide">Premium</span>
-                                <span className="font-medium text-lg text-gray-900">{contractDetails.premium} ETH</span>
+                        )}
+
+                        {contractDetails && account && contractDetails.insured.toLowerCase() !== account.toLowerCase() && (
+                            <div className="p-4 bg-red-50 text-red-700 rounded-lg border border-red-200 flex items-center">
+                                <AlertTriangle className="h-5 w-5 mr-2" />
+                                <span>You must be connected as the Insured ({contractDetails.insured.slice(0, 6)}...{contractDetails.insured.slice(-4)}) to perform actions.</span>
                             </div>
-                            <div>
-                                <span className="block text-gray-500 text-xs uppercase tracking-wide">Indemnity</span>
-                                <span className="font-medium text-lg text-gray-900">{contractDetails.indemnity} ETH</span>
+                        )}
+
+                        {/* Actions */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Pay Premium Section */}
+                            <div className="space-y-3">
+                                <button
+                                    onClick={payPremium}
+                                    disabled={loading || !contractDetails || contractDetails.isPaid || (contractDetails.insured.toLowerCase() !== account.toLowerCase())}
+                                    className="flex items-center justify-center space-x-2 w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-xl transition duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {contractDetails.isPaid ? <CheckCircle className="h-5 w-5" /> : <CreditCard className="h-5 w-5" />}
+                                    <span>{contractDetails.isPaid ? "Premium Paid" : "Pay Premium"}</span>
+                                </button>
                             </div>
-                            <div>
-                                <span className="block text-gray-500 text-xs uppercase tracking-wide">Payment Status</span>
-                                <span className={`font-bold ${contractDetails.isPaid ? "text-green-600" : "text-red-600"}`}>
-                                    {contractDetails.isPaid ? "Paid" : "Unpaid"}
-                                </span>
+
+                            {/* Declare Claim Section */}
+                            <div className="space-y-3">
+                                {contractDetails.isPaid && contractDetails.claimStatus === 0 && (
+                                    <>
+                                        <input
+                                            type="text"
+                                            placeholder="Description (e.g. Accident le 20/12)"
+                                            value={description}
+                                            onChange={(e) => setDescription(e.target.value)}
+                                            className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                                        />
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder="Evidence Link (optional if file uploaded)"
+                                                value={evidence}
+                                                onChange={(e) => setEvidence(e.target.value)}
+                                                className="flex-1 p-2 border border-gray-300 rounded-lg text-sm"
+                                            />
+                                            <label className="cursor-pointer bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg p-2 flex items-center justify-center transition">
+                                                <input
+                                                    type="file"
+                                                    onChange={(e) => setFile(e.target.files[0])}
+                                                    className="hidden"
+                                                />
+                                                <Upload className={`w-5 h-5 ${file ? 'text-green-600' : 'text-gray-600'}`} />
+                                            </label>
+                                        </div>
+                                        {file && <span className="text-xs text-green-600 truncate block">Selected: {file.name}</span>}
+                                    </>
+                                )}
+                                <button
+                                    onClick={declareClaim}
+                                    disabled={
+                                        loading ||
+                                        !contractDetails ||
+                                        !contractDetails.isPaid ||
+                                        contractDetails.claimStatus !== 0 ||
+                                        (contractDetails.insured.toLowerCase() !== account.toLowerCase())
+                                    }
+                                    className="flex items-center justify-center space-x-2 w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-xl transition duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <AlertTriangle className="h-5 w-5" />
+                                    <span>{contractDetails.claimStatus === 0 ? "Declare Claim" : `Claim ${claimStatusMap[contractDetails.claimStatus]}`}</span>
+                                </button>
                             </div>
                         </div>
                     </div>
                 )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <button
-                        onClick={payPremium}
-                        disabled={loading || !contractDetails}
-                        className="flex items-center justify-center space-x-2 w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-4 px-4 rounded-xl transition duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <CreditCard className="h-5 w-5" />
-                        <span>Pay Premium</span>
-                    </button>
-                    <button
-                        onClick={declareClaim}
-                        disabled={loading || !contractDetails}
-                        className="flex items-center justify-center space-x-2 w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 px-4 rounded-xl transition duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <AlertTriangle className="h-5 w-5" />
-                        <span>Declare Claim</span>
-                    </button>
-                </div>
             </div>
         </div>
     );
